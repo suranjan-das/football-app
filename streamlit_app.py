@@ -4,6 +4,7 @@ import pandas as pd
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 
 import requests
+import os
 
 # use full width of the page
 st.set_page_config(layout="wide")
@@ -13,7 +14,7 @@ competitions = pd.read_json("./asset/files/competitions.json")
 st.title('Football Analysis App')
 
 # define available season options for different tournaments
-fifa_season = ('2022', '2018')
+fifa_season = ('2018', '2022')
 laliga_season = ('2020/2021', '2019/2020', '2018/2019')
 PL_season = ('2015/2016', '2003/2004')
 season = fifa_season
@@ -54,28 +55,32 @@ def get_match_url(df: pd.DataFrame, competition_name: str, season_name: str) -> 
     base_url = f"https://raw.githubusercontent.com/statsbomb/open-data/master/data/matches/{name}/{season}.json"
     return base_url
 
-@st.cache_data(max_entries=10, show_spinner=True)
+@st.cache_data(max_entries=50, show_spinner=True)
 def get_match_data(url: str)->pd.DataFrame:
     response = requests.get(url)
-    matches_data = {'match_date': [], 'home_team': [],
+    matches_data = {'match_date': [],'home_flag_url': [], 'home_team': [],
                     'home_score': [], 'away_score': [],
-                    'away_team': [], 'match_id': []}
+                    'away_flag_url': [],'away_team': [], 'match_id': []}
     if response.status_code == 200:
         json_data = response.json()
         event_id = json_data[0]['match_id']
         for match in json_data:
-            new_match = {'match_date': match['match_date'], 'home_team': match['home_team']['home_team_name'], 
-                         'away_team': match['away_team']['away_team_name'], 'home_score': match['home_score'], 
+            new_match = {'match_date': match['match_date'],'home_flag_url': '', 'home_team': match['home_team']['home_team_name'], 
+                         'home_flag_url': '','away_team': match['away_team']['away_team_name'], 'home_score': match['home_score'], 
                          'away_score': match['away_score'], 'match_id': match['match_id']}
+            # new_match['home_flag_url'] = "https://www.worldometers.info/img/flags/af-flag.gif"
+            new_match['home_flag_url'] = f"./img/{new_match['home_team']}.png"
+            new_match['away_flag_url'] = f"./img/{new_match['away_team']}.png"
             for k, v in new_match.items():
                 matches_data[k].append(v)
     else:
         print("Failed to fetch the file. Status code:", response.status_code)
     matches_df = pd.DataFrame(matches_data)
+    matches_df["match_date"] = pd.to_datetime(matches_df["match_date"])
 
     return matches_df
 
-@st.cache_data(max_entries=10, show_spinner=True)
+@st.cache_data(max_entries=50, show_spinner=True)
 def get_lineup_data(event_id: str) -> dict:
     lineup = {}
     lineup_url = f"https://raw.githubusercontent.com/statsbomb/open-data/master/data/lineups/{event_id}.json"
@@ -116,12 +121,34 @@ gd.configure_column(field="match_date",
                     custom_format_string="dd/MM/yyyy",
                     width='20%',
                     initialSort='asc')
+render_image = JsCode("""
+    class ThumbnailRenderer {
+        init(params) {
+            this.eGui = document.createElement('img');
+            this.eGui.setAttribute('src', params.value);
+            console.log(this.eGui.getAttribute('src'));
+            this.eGui.setAttribute('width', '30');
+            this.eGui.setAttribute('height', '25');
+        }
+        getGui() {
+            return this.eGui;
+        }
+    }
+""")
+gd.configure_column(field='home_flag_url',
+                    header_name='',
+                    cellRenderer=render_image,
+                    width='10%')
+gd.configure_column(field='away_flag_url',
+                    header_name='',
+                    cellRenderer=render_image,
+                    width='10%')
 gd.configure_column(field="home_team",
                     header_name="Team 1",
-                    width='30%')
+                    width='20%')
 gd.configure_column(field="away_team",
                     header_name="Team 2",
-                    width='30%')
+                    width='20%')
 #configures last row to use custom styles based on cell's value, injecting JsCode on components front end
 home_score_jscode = JsCode("""
 function(params) {
@@ -187,7 +214,9 @@ gd.configure_column(field="away_score",
                     cellStyle=away_score_jscode)
 gd.configure_pagination(enabled=False)
 gd.configure_selection(selection_mode="single", use_checkbox=True)
+# pre_select = matches_df[matches_df['match_date'] == matches_df['match_date'].min()].index[0]
 gd.configure_selection('single', pre_selected_rows=[0])
+gd.configure_grid_options(domLayout='normal')
 grid_options = gd.build()
 
 # display match lineup
@@ -201,7 +230,8 @@ with lineup_col1:
                     height=500,
                     width='100%',
                     update_mode=GridUpdateMode.SELECTION_CHANGED,
-                    allow_unsafe_jscode=True)
+                    allow_unsafe_jscode=True,
+                    theme="balham")
 
 selected_row = matches_ag_grid["selected_rows"]
 
@@ -218,5 +248,6 @@ with lineup_col2:
                             cellStyle={'text-align':'center'})
         grid_options_l = gdl.build()
         lineup_ag_grid = AgGrid(lineup_df,
-                                gridOptions=grid_options_l)
+                                gridOptions=grid_options_l,
+                                theme="balham")
 
