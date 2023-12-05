@@ -68,9 +68,10 @@ def get_match_data(url: str)->pd.DataFrame:
             new_match = {'match_date': match['match_date'],'home_flag_url': '', 'home_team': match['home_team']['home_team_name'], 
                          'home_flag_url': '','away_team': match['away_team']['away_team_name'], 'home_score': match['home_score'], 
                          'away_score': match['away_score'], 'match_id': match['match_id']}
-            # new_match['home_flag_url'] = "https://www.worldometers.info/img/flags/af-flag.gif"
-            new_match['home_flag_url'] = f"./img/{new_match['home_team']}.png"
-            new_match['away_flag_url'] = f"./img/{new_match['away_team']}.png"
+            new_match['home_flag_url'] = f"https://raw.githubusercontent.com/suranjan-das/football-app/main/asset/img/{new_match['home_team'].replace(' ', '-')}.png"
+            new_match['away_flag_url'] = f"https://raw.githubusercontent.com/suranjan-das/football-app/main/asset/img/{new_match['away_team'].replace(' ', '-')}.png"
+            # new_match['home_flag_url'] = f"./img/{new_match['home_team']}.png"
+            # new_match['away_flag_url'] = f"./img/{new_match['away_team']}.png"
             for k, v in new_match.items():
                 matches_data[k].append(v)
     else:
